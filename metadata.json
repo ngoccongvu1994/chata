@@ -1,0 +1,6 @@
+{
+  "name": "Chata",
+  "description": "Một ứng dụng chat bảo mật tối ưu trên thiết bị di động với phân quyền User/Admin, lưu trữ đám mây và chia sẻ đa phương tiện tốc độ cao.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
