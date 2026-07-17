@@ -1,6 +1,7 @@
 import express from 'express';
 import path from 'path';
 import fs from 'fs';
+import cors from 'cors';
 import multer from 'multer';
 import { createServer as createViteServer } from 'vite';
 import { User, Room, Message } from './src/types';
@@ -19,7 +20,10 @@ import {
 } from 'firebase/firestore';
 
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
+
+// Enable CORS
+app.use(cors());
 
 // Enable JSON body parsing with large limit for potential base64 or heavy content
 app.use(express.json({ limit: '10mb' }));
@@ -36,17 +40,32 @@ const configPath = path.join(process.cwd(), 'firebase-applet-config.json');
 let firebaseApp: any;
 let db: any;
 
-if (fs.existsSync(configPath)) {
+let firebaseConfig: any = null;
+
+if (process.env.FIREBASE_CONFIG) {
   try {
-    const firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    firebaseConfig = JSON.parse(process.env.FIREBASE_CONFIG);
+  } catch (err) {
+    console.error('Lỗi phân tích FIREBASE_CONFIG env:', err);
+  }
+} else if (fs.existsSync(configPath)) {
+  try {
+    firebaseConfig = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+  } catch (err) {
+    console.error('Lỗi đọc firebase-applet-config.json:', err);
+  }
+}
+
+if (firebaseConfig) {
+  try {
     firebaseApp = initializeApp(firebaseConfig);
-    db = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId);
-    console.log('Firebase initialized successfully with project:', firebaseConfig.projectId, 'database:', firebaseConfig.firestoreDatabaseId);
+    db = getFirestore(firebaseApp, firebaseConfig.firestoreDatabaseId || '(default)');
+    console.log('Firebase initialized successfully with project:', firebaseConfig.projectId);
   } catch (error) {
     console.error('Lỗi khi khởi tạo Firebase:', error);
   }
 } else {
-  console.error('Không tìm thấy tệp cấu hình firebase-applet-config.json!');
+  console.warn('CẢNH BÁO: Không tìm thấy cấu hình Firebase (FIREBASE_CONFIG env hoặc firebase-applet-config.json)!');
 }
 
 // --- SEED FIREBASE CODES ---
@@ -713,7 +732,11 @@ async function startServer() {
     // Support wildcard routing for React SPA
     app.get('*', (req, res, next) => {
       // Don't intercept API or uploaded file requests
-      if (req.url.startsWith('/api') || req.url.startsWith('/uploads')) {
+      if (req.url.startsWith('/api')) {
+        res.status(404).json({ error: 'Endpoint không tồn tại' });
+        return;
+      }
+      if (req.url.startsWith('/uploads')) {
         return next();
       }
       res.sendFile(path.join(distPath, 'index.html'));
